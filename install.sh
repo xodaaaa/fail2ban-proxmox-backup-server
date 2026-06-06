@@ -138,9 +138,43 @@ if ! $NO_TELEGRAM; then
             read -r -p "  Token del bot (de @BotFather): " BOT_TOKEN
         done
 
-        while [ -z "${CHAT_ID:-}" ]; do
-            read -r -p "  Chat ID (tu usuario o grupo): " CHAT_ID
-        done
+        echo "  Como deseas obtener el Chat ID?"
+        echo "    [1] Automatico - Envia /start al bot y lo detecto solo"
+        echo "    [2] Manual - Ingresas el Chat ID directamente"
+        read -r -p "  Opcion (1/2) [1]: " id_option
+
+        CHAT_ID=""
+        if [[ "${id_option:-1}" != "2" ]]; then
+            echo ""
+            echo "  Modo automatico:"
+            echo "  Envia /start al bot en Telegram para detectar tu Chat ID..."
+            if [ -f "$REPO_DIR/telegram/get-chat-id.sh" ]; then
+                run cp "$REPO_DIR/telegram/get-chat-id.sh" "$TELEGRAM_DIR_DST/"
+            fi
+            # Create temp config so get-chat-id can read it
+            if ! $DRY_RUN; then
+                mkdir -p "$TELEGRAM_DIR_DST"
+                cat > "$TELEGRAM_CONFIG" << EOF
+#!/bin/bash
+TELEGRAM_BOT_TOKEN="${BOT_TOKEN}"
+TELEGRAM_CHAT_ID=""
+PBS_AUTH_LOG="${PBS_AUTH_LOG}"
+FAIL2BAN_LOG="${F2B_LOG}"
+EOF
+                chmod 600 "$TELEGRAM_CONFIG"
+                # Run the chat ID detection
+                DETECTED=$("$TELEGRAM_DIR_DST/get-chat-id.sh" --config "$TELEGRAM_CONFIG" 2>&1) || true
+                echo "$DETECTED"
+                # Reload config to get the CHAT_ID
+                source "$TELEGRAM_CONFIG" 2>/dev/null || true
+            fi
+        fi
+
+        if [ -z "${CHAT_ID:-}" ]; then
+            while [ -z "$CHAT_ID" ]; do
+                read -r -p "  Chat ID (tu usuario o grupo): " CHAT_ID
+            done
+        fi
 
         run mkdir -p "$TELEGRAM_DIR_DST"
 
