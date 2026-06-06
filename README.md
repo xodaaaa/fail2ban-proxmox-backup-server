@@ -35,12 +35,13 @@ Esto instalará fail2ban, copiará las configuraciones y te preguntará si desea
 ### Opciones del instalador
 
 ```bash
-# Ejecutar como root o con sudo
-./install.sh                       # Instalación interactiva completa
-./install.sh --no-telegram         # Solo fail2ban, sin Telegram
+./install.sh                       # Instalación completa con Telegram
+./install.sh --no-telegram         # Sin bot de Telegram
 ./install.sh --dry-run             # Simular sin hacer cambios
 ./install.sh --uninstall           # Eliminar todas las configuraciones
 ```
+
+> ⚠️ **El bot de Telegram se configura por defecto.** Si no querés Telegram, usá `--no-telegram`.
 
 ## Instalación Manual
 
@@ -87,7 +88,7 @@ Para activarla, descomenta las líneas en `jail.d/proxmox-backup-server.conf` y 
 
 ## Bot de Telegram
 
-Recibe notificaciones en tiempo real cuando se banea una IP, más reportes periódicos y análisis de seguridad.
+El bot de Telegram **se instala y configura por defecto** junto con fail2ban. Recibe notificaciones en tiempo real cuando se banea una IP, más reportes periódicos y análisis de seguridad.
 
 ### Requisitos previos
 
