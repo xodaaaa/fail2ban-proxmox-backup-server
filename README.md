@@ -1,132 +1,197 @@
 # fail2ban-proxmox-backup-server
 
-Fail2Ban for Proxmox Backup Server (PBS)
+Fail2Ban para **Proxmox Backup Server (PBS)** — protege tu servidor de ataques de fuerza bruta contra la API y WebGUI.
 
-filter and jail for fail2ban protecting a Proxmox Backup Server (PBS) from brute force attacks to the API/WebGUI
+## Características
 
-# Requirements
+- 🛡️ Filtro para detectar intentos de autenticación fallidos en PBS
+- ⚙️ Jail optimizado con `maxretry=5`, `bantime.increment` y `ignoreip`
+- 🔒 Baneo progresivo para reincidentes (factor x2, hasta 1 semana)
+- 🤖 **Bot de Telegram** opcional con notificaciones en tiempo real
+- 📊 Reportes periódicos de estado y análisis de seguridad
+- 📈 Informe semanal con estadísticas de ataques
 
-- [fail2ban](https://www.fail2ban.org/wiki/index.php/Main_Page) - see [fail2ban requirements](https://www.fail2ban.org/wiki/index.php/Requirements)
-- fail2ban needs [iptables](https://www.netfilter.org/projects/iptables/index.html).
+## Requisitos
 
-# Installation
+- Proxmox Backup Server (cualquier versión reciente)
+- fail2ban (se instala automáticamente con el script)
+- iptables
+- curl (para notificaciones Telegram)
 
-## Install fail2ban on a Proxmox Backup Server
+## Instalación Rápida
 
+```bash
+# Descargar el repositorio
+git clone https://github.com/xodaaaa/fail2ban-proxmox-backup-server.git
+cd fail2ban-proxmox-backup-server
+
+# Ejecutar el instalador (como root)
+chmod +x install.sh
+sudo ./install.sh
 ```
-apt -y update; apt -y install fail2ban iptables
+
+Esto instalará fail2ban, copiará las configuraciones y te preguntará si deseas configurar el bot de Telegram.
+
+### Opciones del instalador
+
+```bash
+sudo ./install.sh                  # Instalación interactiva completa
+sudo ./install.sh --no-telegram    # Solo fail2ban, sin Telegram
+sudo ./install.sh --dry-run        # Simular sin hacer cambios
+sudo ./install.sh --uninstall      # Eliminar todas las configuraciones
 ```
 
-## Add the configs from this repository
+## Instalación Manual
 
-```
-# Download or clone this repository
-git clone https://github.com/inettgmbh/fail2ban-proxmox-backup-server.git
+```bash
+# Instalar dependencias
+apt update && apt install -y fail2ban iptables
 
-# Put filter.d/proxmox-backup-server.conf contents to /etc/fail2ban/filter.d/proxmox-backup-server.conf
-cp filter.d/proxmox-backup-server.conf /etc/fail2ban/filter.d/proxmox-backup-server.conf
+# Copiar configuraciones
+cp filter.d/proxmox-backup-server.conf /etc/fail2ban/filter.d/
+cp jail.d/proxmox-backup-server.conf /etc/fail2ban/jail.d/
 
-# Put jail.d/proxmox-backup-server.conf to /etc/fail2ban/jail.d/proxmox-backup-server.conf
-cp jail.d/proxmox-backup-server.conf /etc/fail2ban/jail.d/proxmox-backup-server.conf
-
-# Restart Fail2Ban Service
+# Reiniciar fail2ban
 systemctl restart fail2ban.service
-```
 
-## Check if new jail is active
-
-```
-fail2ban-client status
-
-Status
-|- Number of jail:	2
-`- Jail list:	proxmox-backup-server, sshd
-```
-
-```
+# Verificar estado
 fail2ban-client status proxmox-backup-server
-
-Status for the jail: proxmox-backup-server
-|- Filter
-|  |- Currently failed:	0
-|  |- Total failed:	0
-|  `- File list:	/var/log/proxmox-backup/api/auth.log
-`- Actions
-   |- Currently banned:	0
-   |- Total banned:	0
-   `- Banned IP list:
 ```
 
-# Telegram Bot Monitoring (Optional)
+## Configuración del Jail
 
-Get real-time notifications on Telegram when IPs are banned, plus periodic status reports and security analysis.
+| Parámetro | Valor | Descripción |
+|-----------|-------|-------------|
+| `maxretry` | 5 | Intentos fallidos antes de banear |
+| `findtime` | 60m | Ventana de tiempo para contar intentos |
+| `bantime` | 1h | Duración del primer baneo |
+| `bantime.increment` | true | Aumenta el baneo en cada reincidencia |
+| `bantime.factor` | 2 | Multiplicador del baneo progresivo |
+| `bantime.maxtime` | 1w | Duración máxima de baneo |
+| `banaction` | iptables-allports | Bloquea todos los puertos |
 
-## Setup
+### Red privada excluida (`ignoreip`)
 
-### 1. Create a Telegram Bot
+Por defecto se excluyen:
 
-1. Open Telegram and search for [@BotFather](https://t.me/BotFather)
-2. Send `/newbot` and follow the prompts to create your bot
-3. Save the bot token (looks like `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
+- `127.0.0.1/8` — localhost IPv4
+- `::1` — localhost IPv6
+- `10.0.0.0/8` — red privada clase A
+- `172.16.0.0/12` — red privada clase B
+- `192.168.0.0/16` — red privada clase C
 
-### 2. Get Your Chat ID
+### Jail Recidiva (para reincidentes persistentes)
 
-1. Start a chat with your new bot and send `/start`
-2. Open in browser: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
-3. Look for `"chat":{"id":<YOUR_CHAT_ID>}` in the response
+Para activarla, descomenta las líneas en `jail.d/proxmox-backup-server.conf` y asegúrate de que fail2ban esté logueando en `/var/log/fail2ban.log`.
 
-### 3. Install & Configure
+## Bot de Telegram
 
-```
-# Copy config and edit with your token and chat ID
+Recibe notificaciones en tiempo real cuando se banea una IP, más reportes periódicos y análisis de seguridad.
+
+### Requisitos previos
+
+1. Abre Telegram y busca [@BotFather](https://t.me/BotFather)
+2. Envía `/newbot` y sigue las instrucciones para crear tu bot
+3. Guarda el **token** que recibes (ej: `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
+4. Inicia una conversación con tu bot y envía `/start`
+5. Obtén tu **Chat ID** abriendo: `https://api.telegram.org/bot<TU_TOKEN>/getUpdates`
+6. Busca `"chat":{"id":<NUMERO>}` en la respuesta
+
+### Scripts disponibles
+
+| Script | Función | Activación |
+|--------|---------|------------|
+| `telegram/notify.sh` | Notificaciones de baneo/desbaneo | Acción de fail2ban |
+| `telegram/status.sh` | Estado actual de las jails | Cron (cada 30 min) |
+| `telegram/alerts.sh` | Detección de patrones de ataque | Cron (cada 15 min) |
+| `telegram/weekly-report.sh` | Informe semanal de seguridad | Cron (semanal) |
+
+### Instalación manual del bot
+
+```bash
+# Copiar configuración y scripts
 mkdir -p /etc/fail2ban/telegram
 cp telegram/config.sh.example /etc/fail2ban/telegram/config.sh
 chmod 600 /etc/fail2ban/telegram/config.sh
-nano /etc/fail2ban/telegram/config.sh
+nano /etc/fail2ban/telegram/config.sh  # ← Editar token y chat ID
 
-# Install scripts
-cp telegram/notify.sh /etc/fail2ban/telegram/
-cp telegram/status.sh /etc/fail2ban/telegram/
-cp telegram/alerts.sh /etc/fail2ban/telegram/
-cp telegram/weekly-report.sh /etc/fail2ban/telegram/
+# Copiar scripts
+cp telegram/*.sh /etc/fail2ban/telegram/
 chmod +x /etc/fail2ban/telegram/*.sh
 
-# Install action.d config for fail2ban integration
+# Copiar acción de fail2ban
 cp action.d/telegram.conf /etc/fail2ban/action.d/
 
-# Enable Telegram in jail config (uncomment the action lines)
-# then restart fail2ban:
+# Habilitar en jail.d (descomentar las líneas action)
+# y reiniciar:
 systemctl restart fail2ban.service
 ```
 
-### 4. Schedule Periodic Reports (Optional)
+### Tareas programadas (cron)
 
-Add to crontab (`crontab -e`):
-
-```
-# Status report every 30 minutes
+```bash
+# Reportes cada 30 minutos
 */30 * * * * /etc/fail2ban/telegram/status.sh
 
-# Security alerts every 15 minutes
+# Alertas de seguridad cada 15 minutos
 */15 * * * * /etc/fail2ban/telegram/alerts.sh
 
-# Weekly report every Monday at 9 AM
+# Informe semanal cada lunes a las 9 AM
 0 9 * * 1 /etc/fail2ban/telegram/weekly-report.sh
 ```
 
-## Telegram Scripts Overview
+### Ejemplo de notificaciones
 
-| Script | Purpose | Trigger |
-|--------|---------|---------|
-| `notify.sh` | Ban/unban notifications | fail2ban action |
-| `status.sh` | Current jail status | cron (every 30m) |
-| `alerts.sh` | Pattern analysis & brute force detection | cron (every 15m) |
-| `weekly-report.sh` | Weekly security summary | cron (weekly) |
+```
+🚫 IP BANEADA
+IP: 185.220.101.x
+Jail: proxmox-backup-server
+Origen: Alemania - Contabo GmbH
 
-## Features
+📊 Estado fail2ban - PBS
+Baneados actuales: 3
+Baneados totales: 12
+Fallos actuales: 0
 
-- 🚫 Real-time ban/unban alerts with IP geolocation
-- 📊 Periodic jail status reports (banned IPs, failure counts)
-- 🔍 Brute force attack detection (same IP, multiple users)
-- 🎯 Credential stuffing detection (same user, multiple IPs)
-- 📈 Weekly security report with top attackers and statistics```
+🔍 Alerta de Seguridad
+Ataque de fuerza bruta detectado:
+185.220.101.x (45 intentos en 30 min)
+
+📈 Informe Semanal
+Fallos de autenticación: 1,234
+IPs únicas baneadas: 28
+```
+
+## Archivos del proyecto
+
+```
+├── filter.d/
+│   └── proxmox-backup-server.conf   ← Regex para detectar auth fallidos
+├── jail.d/
+│   └── proxmox-backup-server.conf   ← Configuración de la jail
+├── action.d/
+│   └── telegram.conf                ← Acción de fail2ban para Telegram
+├── telegram/
+│   ├── config.sh.example            ← Plantilla de configuración
+│   ├── notify.sh                    ← Notificaciones ban/unban
+│   ├── status.sh                    ← Reporte de estado
+│   ├── alerts.sh                    ← Análisis de seguridad
+│   └── weekly-report.sh             ← Informe semanal
+├── install.sh                       ← Instalador completo
+└── LICENSE
+```
+
+## Personalización
+
+Puedes ajustar los siguientes parámetros editando `/etc/fail2ban/jail.d/proxmox-backup-server.conf`:
+
+- `maxretry`: número de intentos antes de banear
+- `bantime`: duración del baneo
+- `findtime`: ventana de tiempo para contar intentos
+- `ignoreip`: IPs/rangos excluidos (separados por espacio)
+- `bantime.factor`: multiplicador para baneo progresivo
+- `bantime.maxtime`: duración máxima del baneo
+
+## Licencia
+
+Este proyecto está bajo la licencia MIT. Ver archivo `LICENSE`.
