@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script completo de instalacion y configuracion de fail2ban para Proxmox Backup Server
-# con soporte opcional de notificaciones Telegram
+# con notificaciones Telegram incluidas por defecto
 # Uso: ./install.sh [--dry-run] [--no-telegram] [--uninstall]
 
 set -euo pipefail
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Uso: $0 [--dry-run] [--no-telegram] [--uninstall]"
             echo "  --dry-run      Simula la instalacion sin hacer cambios"
-            echo "  --no-telegram  Instala solo fail2ban, sin el bot de Telegram"
+            echo "  --no-telegram  Instala fail2ban sin el bot de Telegram"
             echo "  --uninstall    Elimina todas las configuraciones instaladas"
             exit 0
             ;;
@@ -127,133 +127,115 @@ echo "   Jail:    $JAIL_DST"
 # --- 4. Configurar Telegram --------------------------------------------------
 INSTALL_TELEGRAM=false
 if ! $NO_TELEGRAM; then
+    INSTALL_TELEGRAM=true
+    run mkdir -p "$TELEGRAM_DIR_DST"
+
     echo ""
-    echo "[4/7] Configuracion del bot de Telegram (opcional)"
+    echo "[4/7] Configuracion del bot de Telegram"
     echo "--------------------------------------------------"
-    read -r -p "  Deseas configurar notificaciones Telegram? (s/N): " resp
-    if [[ "$resp" =~ ^[sS]$ ]]; then
-        INSTALL_TELEGRAM=true
 
-        while [ -z "${BOT_TOKEN:-}" ]; do
-            read -r -p "  Token del bot (de @BotFather): " BOT_TOKEN
-        done
+    while [ -z "${BOT_TOKEN:-}" ]; do
+        read -r -p "  Token del bot (de @BotFather): " BOT_TOKEN
+    done
 
-        echo "  Como deseas obtener el Chat ID?"
-        echo "    [1] Automatico - Envia /start al bot y lo detecto solo"
-        echo "    [2] Manual - Ingresas el Chat ID directamente"
-        read -r -p "  Opcion (1/2) [1]: " id_option
+    echo "  Como deseas obtener el Chat ID?"
+    echo "    [1] Automatico - Envia /start al bot y lo detecto solo"
+    echo "    [2] Manual - Ingresas el Chat ID directamente"
+    read -r -p "  Opcion (1/2) [1]: " id_option
 
-        run mkdir -p "$TELEGRAM_DIR_DST"
-
-        CHAT_ID=""
-        if [[ "${id_option:-1}" != "2" ]]; then
-            echo ""
-            echo "  Modo automatico:"
-            echo "  Envia /start al bot en Telegram para detectar tu Chat ID..."
-            if [ -f "$REPO_DIR/telegram/get-chat-id.sh" ]; then
-                run cp "$REPO_DIR/telegram/get-chat-id.sh" "$TELEGRAM_DIR_DST/"
-                run chmod +x "$TELEGRAM_DIR_DST/get-chat-id.sh"
-            fi
-            # Create temp config so get-chat-id can read it
-            if ! $DRY_RUN; then
-                cat > "$TELEGRAM_CONFIG" << EOF
+    CHAT_ID=""
+    if [[ "${id_option:-1}" != "2" ]]; then
+        echo ""
+        echo "  Envia /start al bot en Telegram para detectar tu Chat ID..."
+        if [ -f "$REPO_DIR/telegram/get-chat-id.sh" ]; then
+            run cp "$REPO_DIR/telegram/get-chat-id.sh" "$TELEGRAM_DIR_DST/"
+            run chmod +x "$TELEGRAM_DIR_DST/get-chat-id.sh"
+        fi
+        if ! $DRY_RUN; then
+            cat > "$TELEGRAM_CONFIG" << EOF
 #!/bin/bash
 TELEGRAM_BOT_TOKEN="${BOT_TOKEN}"
 TELEGRAM_CHAT_ID=""
 PBS_AUTH_LOG="${PBS_AUTH_LOG}"
 FAIL2BAN_LOG="${F2B_LOG}"
 EOF
-                chmod 600 "$TELEGRAM_CONFIG"
-                # Run the chat ID detection
-                DETECTED=$("$TELEGRAM_DIR_DST/get-chat-id.sh" --config "$TELEGRAM_CONFIG" 2>&1) || true
-                echo "$DETECTED"
-                # Reload config and assign CHAT_ID variable
-                source "$TELEGRAM_CONFIG" 2>/dev/null || true
-                CHAT_ID="${TELEGRAM_CHAT_ID:-}"
-            fi
+            chmod 600 "$TELEGRAM_CONFIG"
+            DETECTED=$("$TELEGRAM_DIR_DST/get-chat-id.sh" --config "$TELEGRAM_CONFIG" 2>&1) || true
+            echo "$DETECTED"
+            source "$TELEGRAM_CONFIG" 2>/dev/null || true
+            CHAT_ID="${TELEGRAM_CHAT_ID:-}"
         fi
+    fi
 
-        if [ -z "${CHAT_ID:-}" ]; then
-            while [ -z "$CHAT_ID" ]; do
-                read -r -p "  Chat ID (tu usuario o grupo): " CHAT_ID
-            done
-        fi
+    if [ -z "${CHAT_ID:-}" ]; then
+        while [ -z "$CHAT_ID" ]; do
+            read -r -p "  Chat ID (tu usuario o grupo): " CHAT_ID
+        done
+    fi
 
-        if ! $DRY_RUN; then
-            cat > "$TELEGRAM_CONFIG" << EOF
+    if ! $DRY_RUN; then
+        cat > "$TELEGRAM_CONFIG" << EOF
 #!/bin/bash
-# Configuracion del bot de Telegram para fail2ban PBS
 TELEGRAM_BOT_TOKEN="${BOT_TOKEN}"
 TELEGRAM_CHAT_ID="${CHAT_ID}"
 PBS_AUTH_LOG="${PBS_AUTH_LOG}"
 FAIL2BAN_LOG="${F2B_LOG}"
 EOF
-            chmod 600 "$TELEGRAM_CONFIG"
-            echo "   Config:  $TELEGRAM_CONFIG"
-        fi
+        chmod 600 "$TELEGRAM_CONFIG"
+        echo "   Config:  $TELEGRAM_CONFIG"
+    fi
 
-        if [ -d "$TELEGRAM_DIR_SRC" ]; then
-            for script in notify.sh status.sh alerts.sh weekly-report.sh; do
-                if [ -f "$TELEGRAM_DIR_SRC/$script" ]; then
-                    run cp "$TELEGRAM_DIR_SRC/$script" "$TELEGRAM_DIR_DST/"
-                fi
-            done
-            run chmod +x "$TELEGRAM_DIR_DST"/*.sh
-            echo "   Scripts: $TELEGRAM_DIR_DST"
-        fi
-
-        if [ -f "$ACTION_SRC" ]; then
-            run cp "$ACTION_SRC" "$ACTION_DST"
-            echo "   Action:  $ACTION_DST"
-        fi
-
-        if ! $DRY_RUN; then
-            # Uncomment Telegram action lines in jail config
-            sed -i '/^# action    = %(action_)s$/s/^# //' "$JAIL_DST"
-            sed -i '/^#            telegram$/s/^# //' "$JAIL_DST"
-            echo "   Telegram habilitado en jail.conf"
-        fi
-
-        echo ""
-        echo "   Probando conexion con Telegram..."
-        if ! $DRY_RUN; then
-            TEST_MSG=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-                -d "chat_id=${CHAT_ID}" \
-                -d "text=*fail2ban PBS* - Conexion establecida correctamente" \
-                -d "parse_mode=Markdown" 2>&1)
-            if echo "$TEST_MSG" | grep -q '"ok":true'; then
-                echo "   Mensaje de prueba enviado correctamente a Telegram."
-            else
-                echo "   No se pudo enviar el mensaje de prueba."
-                echo "   Error: $(echo "$TEST_MSG" | grep -o '"description":"[^"]*"' | head -1)"
+    if [ -d "$TELEGRAM_DIR_SRC" ]; then
+        for script in notify.sh status.sh alerts.sh weekly-report.sh; do
+            if [ -f "$TELEGRAM_DIR_SRC/$script" ]; then
+                run cp "$TELEGRAM_DIR_SRC/$script" "$TELEGRAM_DIR_DST/"
             fi
+        done
+        run chmod +x "$TELEGRAM_DIR_DST"/*.sh
+        echo "   Scripts: $TELEGRAM_DIR_DST"
+    fi
+
+    if [ -f "$ACTION_SRC" ]; then
+        run cp "$ACTION_SRC" "$ACTION_DST"
+        echo "   Action:  $ACTION_DST"
+    fi
+
+    echo ""
+    echo "   Probando conexion con Telegram..."
+    if ! $DRY_RUN; then
+        TEST_MSG=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT_ID}" \
+            -d "text=*fail2ban PBS* - Conexion establecida correctamente" \
+            -d "parse_mode=Markdown" 2>&1)
+        if echo "$TEST_MSG" | grep -q '"ok":true'; then
+            echo "   Mensaje de prueba enviado correctamente a Telegram."
         else
-            echo "   (simulado) Mensaje de prueba enviado"
-        fi
-
-        # --- 5. Configurar cron ----------------------------------------------
-        echo ""
-        echo "[5/7] Configuracion de tareas programadas (cron)"
-        echo "------------------------------------------------"
-        read -r -p "  Configurar reportes periodicos por cron? (S/n): " cron_resp
-        if [[ ! "$cron_resp" =~ ^[nN]$ ]]; then
-            if ! $DRY_RUN; then
-                (crontab -l 2>/dev/null | grep -v "fail2ban/telegram"; \
-                 echo "*/30 * * * * $TELEGRAM_DIR_DST/status.sh"; \
-                 echo "*/15 * * * * $TELEGRAM_DIR_DST/alerts.sh"; \
-                 echo "0 9 * * 1 $TELEGRAM_DIR_DST/weekly-report.sh") | crontab - || true
-                echo "   Tareas cron instaladas:"
-            fi
-            echo "      status.sh       cada 30 min (estado de jails)"
-            echo "      alerts.sh       cada 15 min (analisis de seguridad)"
-            echo "      weekly-report   cada lunes 9 AM (informe semanal)"
+            echo "   No se pudo enviar el mensaje de prueba."
+            echo "   Error: $(echo "$TEST_MSG" | grep -o '"description":"[^"]*"' | head -1)"
         fi
     fi
-fi
 
-if ! $INSTALL_TELEGRAM; then
+    # --- 5. Configurar cron --------------------------------------------------
     echo ""
-    echo "[4/7] Telegram omitido."
+    echo "[5/7] Configuracion de tareas programadas (cron)"
+    echo "------------------------------------------------"
+    read -r -p "  Configurar reportes periodicos por cron? (S/n): " cron_resp
+    if [[ ! "$cron_resp" =~ ^[nN]$ ]]; then
+        if ! $DRY_RUN; then
+            (crontab -l 2>/dev/null | grep -v "fail2ban/telegram"; \
+             echo "*/30 * * * * $TELEGRAM_DIR_DST/status.sh"; \
+             echo "*/15 * * * * $TELEGRAM_DIR_DST/alerts.sh"; \
+             echo "0 9 * * 1 $TELEGRAM_DIR_DST/weekly-report.sh") | crontab - || true
+            echo "   Tareas cron instaladas:"
+        fi
+        echo "      status.sh       cada 30 min (estado de jails)"
+        echo "      alerts.sh       cada 15 min (analisis de seguridad)"
+        echo "      weekly-report   cada lunes 9 AM (informe semanal)"
+    fi
+else
+    # Sin Telegram: copiar jail sin action de Telegram
+    echo ""
+    echo "[4/7] Telegram omitido. El jail se instalara sin action de Telegram."
     echo "[5/7] Cron omitido."
 fi
 
@@ -299,8 +281,7 @@ echo ""
 
 if $INSTALL_TELEGRAM; then
     echo "   Notificaciones Telegram activas."
-    echo "   Recibiras alertas de baneos, reportes periodicos"
-    echo "   y analisis de seguridad en tu chat de Telegram."
+    echo "   Recibiras alertas de baneos en tiempo real."
 fi
 
 echo ""
