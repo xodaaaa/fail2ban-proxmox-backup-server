@@ -27,7 +27,7 @@ cd fail2ban-proxmox-backup-server
 
 # Ejecutar el instalador (como root)
 chmod +x install.sh
-sudo ./install.sh
+./install.sh
 ```
 
 Esto instalará fail2ban, copiará las configuraciones y te preguntará si deseas configurar el bot de Telegram.
@@ -35,10 +35,11 @@ Esto instalará fail2ban, copiará las configuraciones y te preguntará si desea
 ### Opciones del instalador
 
 ```bash
-sudo ./install.sh                  # Instalación interactiva completa
-sudo ./install.sh --no-telegram    # Solo fail2ban, sin Telegram
-sudo ./install.sh --dry-run        # Simular sin hacer cambios
-sudo ./install.sh --uninstall      # Eliminar todas las configuraciones
+# Ejecutar como root o con sudo
+./install.sh                       # Instalación interactiva completa
+./install.sh --no-telegram         # Solo fail2ban, sin Telegram
+./install.sh --dry-run             # Simular sin hacer cambios
+./install.sh --uninstall           # Eliminar todas las configuraciones
 ```
 
 ## Instalación Manual
