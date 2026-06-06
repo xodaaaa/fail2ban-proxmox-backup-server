@@ -1,0 +1,13 @@
+#!/bin/bash
+# Telegram bot configuration for fail2ban Proxmox Backup Server monitoring
+# Copy this file to /etc/fail2ban/telegram/config.sh and fill in your values
+
+# Telegram Bot Token (get from @BotFather on Telegram)
+TELEGRAM_BOT_TOKEN=""
+
+# Telegram Chat ID (your user or group chat ID)
+TELEGRAM_CHAT_ID=""
+
+# Paths (adjust if different from default)
+PBS_AUTH_LOG="/var/log/proxmox-backup/api/auth.log"
+FAIL2BAN_LOG="/var/log/fail2ban.log"
