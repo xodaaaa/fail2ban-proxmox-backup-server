@@ -83,7 +83,7 @@ BANNER
 
 # --- Verificaciones previas -------------------------------------------------
 if [ "$EUID" -ne 0 ] && ! $DRY_RUN; then
-    echo "Este script debe ejecutarse como root (sudo)."
+    echo "Este script debe ejecutarse como root."
     exit 1
 fi
 
