@@ -53,20 +53,25 @@ Servidor: $(hostname)
 $TIMESTAMP"
         ;;
     ban)
-        # Gather info about the banned IP
-        COUNTRY=$(curl -s "http://ip-api.com/json/${IP}?fields=country,isp,org" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d.get(\"country\",\"?\")} - {d.get(\"isp\",\"?\")}')" 2>/dev/null || echo "Desconocido")
+        COUNTRY=$(curl -s "http://ip-api.com/json/${IP}?fields=country,countryCode,isp" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+cc = d.get('countryCode', '')
+flag = ''.join(chr(0x1F1E6 + ord(c) - ord('A')) for c in cc.upper()) if cc else ''
+country = d.get('country', '?')
+isp = d.get('isp', '?')
+print(f'{flag} {country}\\n{isp}')
+" 2>/dev/null || echo "🌍 Desconocido")
         send_telegram "🚫 *IP BANEADA*
 IP: \`$IP\`
 Jail: \`$JAIL\`
-Origen: ${COUNTRY}
-Servidor: $(hostname)
+${COUNTRY}
 $TIMESTAMP"
         ;;
     unban)
         send_telegram "✅ *IP DESBANEADA*
 IP: \`$IP\`
 Jail: \`$JAIL\"
-Servidor: $(hostname)
 $TIMESTAMP"
         ;;
     *)
