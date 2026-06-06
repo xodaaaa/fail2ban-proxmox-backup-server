@@ -167,8 +167,9 @@ EOF
                 # Run the chat ID detection
                 DETECTED=$("$TELEGRAM_DIR_DST/get-chat-id.sh" --config "$TELEGRAM_CONFIG" 2>&1) || true
                 echo "$DETECTED"
-                # Reload config to get the CHAT_ID
+                # Reload config and assign CHAT_ID variable
                 source "$TELEGRAM_CONFIG" 2>/dev/null || true
+                CHAT_ID="${TELEGRAM_CHAT_ID:-}"
             fi
         fi
 
