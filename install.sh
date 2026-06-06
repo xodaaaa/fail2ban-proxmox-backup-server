@@ -143,6 +143,8 @@ if ! $NO_TELEGRAM; then
         echo "    [2] Manual - Ingresas el Chat ID directamente"
         read -r -p "  Opcion (1/2) [1]: " id_option
 
+        run mkdir -p "$TELEGRAM_DIR_DST"
+
         CHAT_ID=""
         if [[ "${id_option:-1}" != "2" ]]; then
             echo ""
@@ -153,7 +155,6 @@ if ! $NO_TELEGRAM; then
             fi
             # Create temp config so get-chat-id can read it
             if ! $DRY_RUN; then
-                mkdir -p "$TELEGRAM_DIR_DST"
                 cat > "$TELEGRAM_CONFIG" << EOF
 #!/bin/bash
 TELEGRAM_BOT_TOKEN="${BOT_TOKEN}"
@@ -175,8 +176,6 @@ EOF
                 read -r -p "  Chat ID (tu usuario o grupo): " CHAT_ID
             done
         fi
-
-        run mkdir -p "$TELEGRAM_DIR_DST"
 
         if ! $DRY_RUN; then
             cat > "$TELEGRAM_CONFIG" << EOF
