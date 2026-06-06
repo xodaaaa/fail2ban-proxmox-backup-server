@@ -93,14 +93,26 @@ Recibe notificaciones en tiempo real cuando se banea una IP, más reportes peri�
 1. Abre Telegram y busca [@BotFather](https://t.me/BotFather)
 2. Envía `/newbot` y sigue las instrucciones para crear tu bot
 3. Guarda el **token** que recibes (ej: `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
-4. Inicia una conversación con tu bot y envía `/start`
-5. Obtén tu **Chat ID** abriendo: `https://api.telegram.org/bot<TU_TOKEN>/getUpdates`
-6. Busca `"chat":{"id":<NUMERO>}` en la respuesta
+
+### Obtención del Chat ID
+
+**Opción A — Automática (recomendada):** Ejecuta el script y envía `/start` al bot:
+
+```bash
+./telegram/get-chat-id.sh <TU_TOKEN>
+```
+
+El script detectará tu Chat ID automáticamente y lo guardará en la configuración.
+
+**Opción B — Manual:** Envía `/start` al bot y luego abre en el navegador:
+`https://api.telegram.org/bot<TU_TOKEN>/getUpdates`
+Busca `"chat":{"id":<NUMERO>}` en la respuesta.
 
 ### Scripts disponibles
 
 | Script | Función | Activación |
 |--------|---------|------------|
+| `telegram/get-chat-id.sh` | Obtiene el Chat ID automáticamente | Manual |
 | `telegram/notify.sh` | Notificaciones de baneo/desbaneo | Acción de fail2ban |
 | `telegram/status.sh` | Estado actual de las jails | Cron (cada 30 min) |
 | `telegram/alerts.sh` | Detección de patrones de ataque | Cron (cada 15 min) |
