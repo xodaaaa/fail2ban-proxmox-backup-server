@@ -64,11 +64,11 @@ fail2ban-client status proxmox-backup-server
 
 | Parámetro | Valor | Descripción |
 |-----------|-------|-------------|
-| `maxretry` | 5 | Intentos fallidos antes de banear |
-| `findtime` | 60m | Ventana de tiempo para contar intentos |
-| `bantime` | 1h | Duración del primer baneo |
+| `maxretry` | 2 | Intentos fallidos antes de banear |
+| `findtime` | 30m | Ventana de tiempo para contar intentos |
+| `bantime` | 6h | Duración del primer baneo |
 | `bantime.increment` | true | Aumenta el baneo en cada reincidencia |
-| `bantime.factor` | 2 | Multiplicador del baneo progresivo |
+| `bantime.factor` | 6 | Multiplicador del baneo progresivo |
 | `bantime.maxtime` | 1w | Duración máxima de baneo |
 | `banaction` | iptables-allports | Bloquea todos los puertos |
 
@@ -160,7 +160,8 @@ systemctl restart fail2ban.service
 🚫 IP BANEADA
 IP: 185.220.101.x
 Jail: proxmox-backup-server
-Origen: Alemania - Contabo GmbH
+🇩🇪 Alemania
+Contabo GmbH
 
 📊 Estado fail2ban - PBS
 Baneados actuales: 3
