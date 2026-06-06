@@ -152,6 +152,7 @@ if ! $NO_TELEGRAM; then
             echo "  Envia /start al bot en Telegram para detectar tu Chat ID..."
             if [ -f "$REPO_DIR/telegram/get-chat-id.sh" ]; then
                 run cp "$REPO_DIR/telegram/get-chat-id.sh" "$TELEGRAM_DIR_DST/"
+                run chmod +x "$TELEGRAM_DIR_DST/get-chat-id.sh"
             fi
             # Create temp config so get-chat-id can read it
             if ! $DRY_RUN; then
